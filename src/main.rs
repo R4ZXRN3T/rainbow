@@ -4,9 +4,10 @@ use std::fs::read_to_string;
 
 fn main() {
 	let args: Vec<String> = args().collect();
-	let mut original_hashed_password: String = "".to_owned();
+
+	let original_hashed_password;
+	let password_list_path;
 	let mut salt: String = "".to_owned();
-	let mut password_list_path: String = "".to_owned();
 
 	if args.len() == 3 {
 		original_hashed_password = args[1].clone();
@@ -23,7 +24,7 @@ fn main() {
 	println!("Processing list...");
 
 	drop(args);
-	let password_list = get_password_list(password_list_path.as_str());
+	let password_list = get_password_list(&password_list_path);
 	drop(password_list_path);
 
 	let correct_password = password_list.iter().find_map(|current_password| {
