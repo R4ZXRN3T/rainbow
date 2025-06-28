@@ -1,4 +1,4 @@
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
 use std::env::args;
 use std::fs::read_to_string;
 
@@ -27,15 +27,26 @@ fn main() {
 	let password_list = get_password_list(&password_list_path);
 	drop(password_list_path);
 
-	let correct_password = password_list.iter().find_map(|current_password| {
-		if hex::encode(Sha256::digest(format!("{}{}", current_password, salt)))
-			== original_hashed_password
-		{
-			Some(current_password.clone())
-		} else {
-			None
+	let mut correct_password: Option<String>;
+	if original_hashed_password.len() == 56 {
+		correct_password = check_for_sha224(&original_hashed_password, &salt, &password_list);
+		if correct_password == None {
+			correct_password =
+				check_for_sha512_224(&original_hashed_password, &salt, &password_list);
 		}
-	});
+	} else if original_hashed_password.len() == 64 {
+		correct_password = check_for_sha256(&original_hashed_password, &salt, &password_list);
+		if correct_password == None {
+			correct_password =
+				check_for_sha512_256(&original_hashed_password, &salt, &password_list);
+		}
+	} else if original_hashed_password.len() == 96 {
+		correct_password = check_for_sha348(&original_hashed_password, &salt, &password_list);
+	} else if original_hashed_password.len() == 128 {
+		correct_password = check_for_sha512(&original_hashed_password, &salt, &password_list);
+	} else {
+		correct_password = None;
+	}
 
 	if correct_password == None {
 		println!("Password is not in list or hashed differently.");
@@ -45,6 +56,107 @@ fn main() {
 			correct_password.as_deref().unwrap_or("none-case string")
 		);
 	}
+}
+
+fn check_for_sha224(
+	original_hashed_password: &str,
+	salt: &str,
+	password_list: &Vec<String>,
+) -> Option<String> {
+	let correct_password = password_list.iter().find_map(|current_password| {
+		if hex::encode(Sha224::digest(format!("{}{}", current_password, salt)))
+			== original_hashed_password
+		{
+			Some(current_password.clone())
+		} else {
+			None
+		}
+	});
+	correct_password
+}
+fn check_for_sha256(
+	original_hashed_password: &str,
+	salt: &str,
+	password_list: &Vec<String>,
+) -> Option<String> {
+	let correct_password = password_list.iter().find_map(|current_password| {
+		if hex::encode(Sha256::digest(format!("{}{}", current_password, salt)))
+			== original_hashed_password
+		{
+			Some(current_password.clone())
+		} else {
+			None
+		}
+	});
+	correct_password
+}
+
+fn check_for_sha348(
+	original_hashed_password: &str,
+	salt: &str,
+	password_list: &Vec<String>,
+) -> Option<String> {
+	let correct_password = password_list.iter().find_map(|current_password| {
+		if hex::encode(Sha384::digest(format!("{}{}", current_password, salt)))
+			== original_hashed_password
+		{
+			Some(current_password.clone())
+		} else {
+			None
+		}
+	});
+	correct_password
+}
+
+fn check_for_sha512(
+	original_hashed_password: &str,
+	salt: &str,
+	password_list: &Vec<String>,
+) -> Option<String> {
+	let correct_password = password_list.iter().find_map(|current_password| {
+		if hex::encode(Sha512::digest(format!("{}{}", current_password, salt)))
+			== original_hashed_password
+		{
+			Some(current_password.clone())
+		} else {
+			None
+		}
+	});
+	correct_password
+}
+
+fn check_for_sha512_224(
+	original_hashed_password: &str,
+	salt: &str,
+	password_list: &Vec<String>,
+) -> Option<String> {
+	let correct_password = password_list.iter().find_map(|current_password| {
+		if hex::encode(Sha512_224::digest(format!("{}{}", current_password, salt)))
+			== original_hashed_password
+		{
+			Some(current_password.clone())
+		} else {
+			None
+		}
+	});
+	correct_password
+}
+
+fn check_for_sha512_256(
+	original_hashed_password: &str,
+	salt: &str,
+	password_list: &Vec<String>,
+) -> Option<String> {
+	let correct_password = password_list.iter().find_map(|current_password| {
+		if hex::encode(Sha512_256::digest(format!("{}{}", current_password, salt)))
+			== original_hashed_password
+		{
+			Some(current_password.clone())
+		} else {
+			None
+		}
+	});
+	correct_password
 }
 
 fn get_password_list(path: &str) -> Vec<String> {
