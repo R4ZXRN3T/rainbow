@@ -21,6 +21,10 @@ choice.
 .\rainbow [<hashed password>] [<salt>] [<path to password list>]
 `
 
-- `hashed password`: The hash of the password you want to crack. Needs to be any valid sha256 hash to work.
+- `hashed password`: The hash of the password you want to crack. Needs to be any valid, supported hash to work.
 - `salt`: The salt used for hashing. If you don't know what salt is, you might want to look it up [here](https://en.wikipedia.org/wiki/Salt_(cryptography)). Optional parameter. If left out, an empty String will be used instead.
 - `path to password list`: Input for an absolute path on your file system. The file needs to be raw text and encoded in UTF-8.
+
+### Supported hashes:
+
+MD5, SHA-224, SHA-256, SHA-384, SHA-512, SHA-512/224, SHA-512/256
