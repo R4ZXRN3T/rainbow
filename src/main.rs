@@ -1,4 +1,4 @@
-use sha256::{digest, try_digest};
+use sha256::digest;
 use std::env::args;
 use std::fs::read_to_string;
 
