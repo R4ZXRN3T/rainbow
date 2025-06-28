@@ -1,4 +1,4 @@
-use sha2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
+use sha2::{Digest as Sha2Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
 use std::env::args;
 use std::fs::read_to_string;
 
@@ -49,6 +49,7 @@ fn get_password_list(path: &str) -> Result<Vec<String>, std::io::Error> {
 }
 
 enum HashType {
+	Md5,
 	Sha224,
 	Sha256,
 	Sha384,
@@ -60,6 +61,7 @@ enum HashType {
 impl HashType {
 	fn from_length(len: usize) -> Vec<Self> {
 		match len {
+			32 => vec![Self::Md5],
 			56 => vec![Self::Sha224, Self::Sha512_224],
 			64 => vec![Self::Sha256, Self::Sha512_256],
 			96 => vec![Self::Sha384],
@@ -75,6 +77,7 @@ impl HashType {
 		password_list: &[String],
 	) -> Option<String> {
 		match self {
+			Self::Md5 => check_md5(original_hashed_password, salt, password_list),
 			Self::Sha224 => check_hash::<Sha224>(original_hashed_password, salt, password_list),
 			Self::Sha256 => check_hash::<Sha256>(original_hashed_password, salt, password_list),
 			Self::Sha384 => check_hash::<Sha384>(original_hashed_password, salt, password_list),
@@ -89,7 +92,7 @@ impl HashType {
 	}
 }
 
-fn check_hash<D: Digest>(
+fn check_hash<D: Sha2Digest>(
 	original_hashed_password: &str,
 	salt: &str,
 	password_list: &[String],
@@ -107,10 +110,29 @@ where
 	})
 }
 
+fn check_md5(
+	original_hashed_password: &str,
+	salt: &str,
+	password_list: &[String],
+) -> Option<String> {
+	password_list.iter().find_map(|current_password| {
+		let hash = format!(
+			"{:x}",
+			md5::compute(format!("{}{}", current_password, salt))
+		);
+		if hash == original_hashed_password {
+			Some(current_password.clone())
+		} else {
+			None
+		}
+	})
+}
+
 fn print_usage() {
 	eprintln!("Wrong Arguments!\n");
 	eprintln!("Usage: rainbow [<Hash>] [<Salt>] [<Password list>]\n");
 	eprintln!("\tHash:\t\tThe hashed password you want to crack");
 	eprintln!("\tSalt:\t\tThe salt used for generating the password. This is optional");
 	eprintln!("\tPassword list:\tThe path to the password list you want to go through");
+	eprintln!();
 }
