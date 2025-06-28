@@ -19,14 +19,28 @@ fn main() {
 		print_usage();
 		return;
 	}
+
+	println!("Processing list...");
+
 	drop(args);
 	let password_list = get_password_list(password_list_path.as_str());
 	drop(password_list_path);
 
-	let correct_password = "".to_owned();
+	let correct_password = password_list.iter().find_map(|current_password| {
+		if digest(format!("{}{}", current_password, salt)) == original_hashed_password {
+			Some(current_password.clone())
+		} else {
+			None
+		}
+	});
 
-	for current_password in password_list {
-		let hashed_password = digest(current_password);
+	if correct_password == None {
+		println!("Password is not in list or hashed differently.");
+	} else {
+		print!(
+			"Success! Password found in list: {}",
+			correct_password.as_deref().unwrap_or("none-case string")
+		);
 	}
 }
 
