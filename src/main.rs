@@ -1,7 +1,7 @@
 use std::env;
 
 fn main() {
-    let mut args: Vec<String> = env::args().collect();
+    let args: Vec<String> = env::args().collect();
     let mut hashed_password: String = "".to_owned();
     let mut salt: String = "".to_owned();
     let mut password_list_path: String = "".to_owned();
