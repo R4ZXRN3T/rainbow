@@ -1,4 +1,4 @@
-use sha256::digest;
+use sha2::{Digest, Sha256};
 use std::env::args;
 use std::fs::read_to_string;
 
@@ -28,7 +28,9 @@ fn main() {
 	drop(password_list_path);
 
 	let correct_password = password_list.iter().find_map(|current_password| {
-		if digest(format!("{}{}", current_password, salt)) == original_hashed_password {
+		if hex::encode(Sha256::digest(format!("{}{}", current_password, salt)))
+			== original_hashed_password
+		{
 			Some(current_password.clone())
 		} else {
 			None
