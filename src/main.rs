@@ -2,13 +2,71 @@ use sha2::{Digest as Sha2Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha
 use std::env::args;
 use std::fs::read_to_string;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), &'static str> {
 	let args: Vec<String> = args().collect();
 
-	let (original_hashed_password, salt, password_list_path) = parse_args(&args)?;
+	if args[1] == "crack" {
+		crack_hash(&args)
+	} else if args[1] == "hash" {
+		hash(&args)
+	} else {
+		print_usage();
+		Err("Invalid operation")
+	}
+}
 
-	println!("Processing list...");
-	let password_list = get_password_list(&password_list_path)?;
+fn hash(args: &Vec<String>) -> Result<(), &'static str> {
+	let (algorithm_string, multiplier, to_hash) = match args.len() {
+		4 => (args[2].clone(), 1, args[3].clone()),
+		5 => (
+			args[2].clone(),
+			args[3].parse::<i32>().unwrap(),
+			args[4].clone(),
+		),
+		_ => {
+			print_usage();
+			return Err("Error: Invalid number of arguments");
+		}
+	};
+
+	let algorithm = match algorithm_string.to_lowercase().as_str() {
+		"sha224" => HashType::Sha224,
+		"sha-224" => HashType::Sha224,
+		"sha256" => HashType::Sha256,
+		"sha-256" => HashType::Sha256,
+		"sha384" => HashType::Sha384,
+		"sha-384" => HashType::Sha384,
+		"sha512" => HashType::Sha512,
+		"sha-512" => HashType::Sha512,
+		"sha512_224" => HashType::Sha512_224,
+		"sha-512/224" => HashType::Sha512_224,
+		"sha512_256" => HashType::Sha512_256,
+		"sha-512/256" => HashType::Sha512_256,
+		"md5" => HashType::Md5,
+		_ => return Err("Error: hashing algorithm not supported."),
+	};
+
+	let hashed_string = algorithm.hash(&to_hash, multiplier);
+
+	println!("\nHashed string: {}\n", hashed_string);
+
+	Ok(())
+}
+
+fn crack_hash(args: &Vec<String>) -> Result<(), &'static str> {
+	let (original_hashed_password, salt, password_list_path) = match args.len() {
+		4 => (args[2].clone(), String::new(), args[3].clone()),
+		5 => (args[2].clone(), args[3].clone(), args[4].clone()),
+		_ => {
+			print_usage();
+			return Err("Error: Invalid number of arguments.");
+		}
+	};
+
+	print!("Reading list...");
+	let password_list = get_password_list(&password_list_path)
+		.map_err(|_| "Error: Failed to read password list file")?;
+	print!(" Done!\n");
 
 	let hash_types = HashType::from_length(original_hashed_password.len());
 	if hash_types.is_empty() {
@@ -16,29 +74,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			"Unsupported hash length: {}",
 			original_hashed_password.len()
 		);
-		return Ok(());
+		return Err("Unsupported hash length");
 	}
+
+	print!("Hashing list...");
 
 	for hash_type in hash_types {
 		if let Some(password) = hash_type.check(&original_hashed_password, &salt, &password_list) {
-			println!("Success! Password found: {}", password);
+			print!(" Done!\nSuccess! Password found: {}", password);
 			return Ok(());
 		}
 	}
 
-	println!("Password not found in list.");
+	println!(" Done\nPassword not found in list.");
 	Ok(())
-}
-
-fn parse_args(args: &[String]) -> Result<(String, String, String), &'static str> {
-	match args.len() {
-		3 => Ok((args[1].clone(), String::new(), args[2].clone())),
-		4 => Ok((args[1].clone(), args[2].clone(), args[3].clone())),
-		_ => {
-			print_usage();
-			Err("Invalid number of arguments")
-		}
-	}
 }
 
 fn get_password_list(path: &str) -> Result<Vec<String>, std::io::Error> {
@@ -67,6 +116,18 @@ impl HashType {
 			96 => vec![Self::Sha384],
 			128 => vec![Self::Sha512],
 			_ => vec![],
+		}
+	}
+
+	fn hash(&self, to_hash: &str, multiplier: i32) -> String {
+		match self {
+			Self::Md5 => hash_md5(to_hash, multiplier),
+			Self::Sha224 => hash_sha2::<Sha224>(to_hash, multiplier),
+			Self::Sha256 => hash_sha2::<Sha256>(to_hash, multiplier),
+			Self::Sha384 => hash_sha2::<Sha384>(to_hash, multiplier),
+			Self::Sha512 => hash_sha2::<Sha512>(to_hash, multiplier),
+			Self::Sha512_224 => hash_sha2::<Sha512_224>(to_hash, multiplier),
+			Self::Sha512_256 => hash_sha2::<Sha512_256>(to_hash, multiplier),
 		}
 	}
 
@@ -128,11 +189,38 @@ fn check_md5(
 	})
 }
 
+fn hash_sha2<D: Sha2Digest>(to_hash: &str, multiplier: i32) -> String {
+	let mut final_string = to_hash.to_owned();
+	for _i in 0..multiplier {
+		final_string = hex::encode(D::digest(format!("{}", final_string)));
+	}
+	final_string
+}
+
+fn hash_md5(to_hash: &str, multiplier: i32) -> String {
+	let mut final_string = to_hash.to_owned();
+	for _i in 0..multiplier {
+		final_string = format!("{:x}", md5::compute(format!("{}", final_string)));
+	}
+	final_string
+}
+
 fn print_usage() {
 	eprintln!("Wrong Arguments!\n");
-	eprintln!("Usage: rainbow [<Hash>] [<Salt>] [<Password list>]\n");
+	eprintln!("Usage: rainbow [<Operation>] [<Arguments>]");
+	eprintln!("\nOperation crack:\n");
+	eprintln!("Usage: rainbow crack [<Hash>] [<Salt>] [<Password list>]\n");
 	eprintln!("\tHash:\t\tThe hashed password you want to crack");
 	eprintln!("\tSalt:\t\tThe salt used for generating the password. This is optional");
 	eprintln!("\tPassword list:\tThe path to the password list you want to go through");
+	eprintln!("\nOperation hash:\n");
+	eprintln!("Usage: rainbow hash [<Algorithm>] [<Multiplier>] [<String>]\n");
+	eprintln!(
+		"\tAlgorithm:\tThe Algorithm you want to use for hashing. Supported: sha224, sha256, sha384, sha512, sha512_224, sha512_256, md5"
+	);
+	eprintln!(
+		"\tMultiplier:\tThe amount of times the password should be hashed. Optional parameter."
+	);
+	eprintln!("\tString:\t\tThe string you want to hash");
 	eprintln!();
 }
