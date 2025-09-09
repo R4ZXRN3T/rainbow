@@ -5,6 +5,11 @@ use std::fs::read_to_string;
 fn main() -> Result<(), &'static str> {
 	let args: Vec<String> = args().collect();
 
+	if args.len() < 2 {
+		print_usage();
+		return Err("Invalid operation");
+	}
+
 	if args[1] == "crack" {
 		crack_hash(&args)
 	} else if args[1] == "hash" {
