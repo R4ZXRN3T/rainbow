@@ -1,6 +1,10 @@
 use sha2::{Digest as Sha2Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
 use std::env::args;
 use std::fs::read_to_string;
+use std::io::stdout;
+use std::io::Error;
+use std::io::Write;
+use std::time::SystemTime;
 
 fn main() -> Result<(), &'static str> {
 	let args: Vec<String> = args().collect();
@@ -51,27 +55,50 @@ fn hash(args: &Vec<String>) -> Result<(), &'static str> {
 		_ => return Err("Error: hashing algorithm not supported."),
 	};
 
+	let start_time = SystemTime::now();
 	let hashed_string = algorithm.hash(&to_hash, multiplier);
+	let total_milliseconds: f64 =
+		(start_time.elapsed().expect("Error getting time").as_nanos() as f64) / 1000000.0;
 
-	println!("\nHashed string: {}\n", hashed_string);
+	println!(
+		"\nHashed string: {}\n took: {}ms\n",
+		hashed_string, total_milliseconds
+	);
 
 	Ok(())
 }
 
 fn crack_hash(args: &Vec<String>) -> Result<(), &'static str> {
-	let (original_hashed_password, salt, password_list_path) = match args.len() {
-		4 => (args[2].clone(), String::new(), args[3].clone()),
-		5 => (args[2].clone(), args[3].clone(), args[4].clone()),
+	let (original_hashed_password, salt, password_list_path, multiplier) = match args.len() {
+		4 => (args[2].clone(), String::new(), args[3].clone(), 1),
+		5 => {
+			if let Ok(m) = args[3].parse::<i32>() {
+				(args[2].clone(), String::new(), args[4].clone(), m)
+			} else {
+				(args[2].clone(), args[3].clone(), args[4].clone(), 1)
+			}
+		}
+		6 => (
+			args[2].clone(),
+			args[3].clone(),
+			args[5].clone(),
+			args[4].parse::<i32>().unwrap_or(1),
+		),
 		_ => {
 			print_usage();
 			return Err("Error: Invalid number of arguments.");
 		}
 	};
 
-	print!("Reading list...");
+	print!("\nReading list...");
+	stdout().flush().expect("Error flushing console");
+	let mut start_time = SystemTime::now();
 	let password_list = get_password_list(&password_list_path)
 		.map_err(|_| "Error: Failed to read password list file")?;
-	print!(" Done!\n");
+	let total_milliseconds: f64 =
+		(start_time.elapsed().expect("Error getting time").as_nanos() as f64) / 1000000.0;
+	print!(" Done! in {}ms\n", total_milliseconds);
+	stdout().flush().expect("Error flushing console");
 
 	let hash_types = HashType::from_length(original_hashed_password.len());
 	if hash_types.is_empty() {
@@ -83,19 +110,29 @@ fn crack_hash(args: &Vec<String>) -> Result<(), &'static str> {
 	}
 
 	print!("Hashing list...");
+	stdout().flush().expect("Error flushing console");
 
+	start_time = SystemTime::now();
 	for hash_type in hash_types {
-		if let Some(password) = hash_type.check(&original_hashed_password, &salt, &password_list) {
-			print!(" Done!\nSuccess! Password found: {}", password);
+		if let Some(password) =
+			hash_type.check(&original_hashed_password, &salt, &password_list, multiplier)
+		{
+			let total_milliseconds: f64 =
+				(start_time.elapsed().expect("Error getting time").as_nanos() as f64) / 1000000.0;
+			print!(
+				" Done!\n\nSuccess! Password found: {}\ntook: {}ms",
+				password, total_milliseconds
+			);
 			return Ok(());
 		}
 	}
 
 	println!(" Done\nPassword not found in list.");
+	stdout().flush().expect("Error flushing console");
 	Ok(())
 }
 
-fn get_password_list(path: &str) -> Result<Vec<String>, std::io::Error> {
+fn get_password_list(path: &str) -> Result<Vec<String>, Error> {
 	Ok(read_to_string(path)?
 		.lines()
 		.map(|line| line.to_string())
@@ -141,18 +178,27 @@ impl HashType {
 		original_hashed_password: &str,
 		salt: &str,
 		password_list: &[String],
+		multiplier: i32,
 	) -> Option<String> {
 		match self {
-			Self::Md5 => check_md5(original_hashed_password, salt, password_list),
-			Self::Sha224 => check_hash::<Sha224>(original_hashed_password, salt, password_list),
-			Self::Sha256 => check_hash::<Sha256>(original_hashed_password, salt, password_list),
-			Self::Sha384 => check_hash::<Sha384>(original_hashed_password, salt, password_list),
-			Self::Sha512 => check_hash::<Sha512>(original_hashed_password, salt, password_list),
+			Self::Md5 => check_md5(original_hashed_password, salt, password_list, multiplier),
+			Self::Sha224 => {
+				check_hash::<Sha224>(original_hashed_password, salt, password_list, multiplier)
+			}
+			Self::Sha256 => {
+				check_hash::<Sha256>(original_hashed_password, salt, password_list, multiplier)
+			}
+			Self::Sha384 => {
+				check_hash::<Sha384>(original_hashed_password, salt, password_list, multiplier)
+			}
+			Self::Sha512 => {
+				check_hash::<Sha512>(original_hashed_password, salt, password_list, multiplier)
+			}
 			Self::Sha512_224 => {
-				check_hash::<Sha512_224>(original_hashed_password, salt, password_list)
+				check_hash::<Sha512_224>(original_hashed_password, salt, password_list, multiplier)
 			}
 			Self::Sha512_256 => {
-				check_hash::<Sha512_256>(original_hashed_password, salt, password_list)
+				check_hash::<Sha512_256>(original_hashed_password, salt, password_list, multiplier)
 			}
 		}
 	}
@@ -162,17 +208,31 @@ fn check_hash<D: Sha2Digest>(
 	original_hashed_password: &str,
 	salt: &str,
 	password_list: &[String],
+	multiplier: i32,
 ) -> Option<String>
 where
 	D: Default,
 {
 	password_list.iter().find_map(|current_password| {
-		let hash = hex::encode(D::digest(format!("{}{}", current_password, salt)));
-		if hash == original_hashed_password {
-			Some(current_password.clone())
+		let mut final_string = String::with_capacity(current_password.len() + salt.len());
+		final_string.push_str(current_password);
+		final_string.push_str(salt);
+
+		if multiplier == 1 {
+			let hash = hex::encode(D::digest(&final_string));
+			if hash == original_hashed_password {
+				return Some(current_password.clone());
+			}
 		} else {
-			None
+			let mut hash = final_string;
+			for _ in 0..multiplier {
+				hash = hex::encode(D::digest(&hash));
+			}
+			if hash == original_hashed_password {
+				return Some(current_password.clone());
+			}
 		}
+		None
 	})
 }
 
@@ -180,13 +240,14 @@ fn check_md5(
 	original_hashed_password: &str,
 	salt: &str,
 	password_list: &[String],
+	multiplier: i32,
 ) -> Option<String> {
 	password_list.iter().find_map(|current_password| {
-		let hash = format!(
-			"{:x}",
-			md5::compute(format!("{}{}", current_password, salt))
-		);
-		if hash == original_hashed_password {
+		let mut final_string = format!("{}{}", current_password, salt);
+		for _ in 0..multiplier {
+			final_string = format!("{:x}", md5::compute(&final_string));
+		}
+		if final_string == original_hashed_password {
 			Some(current_password.clone())
 		} else {
 			None
