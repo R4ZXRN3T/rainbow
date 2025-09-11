@@ -39,7 +39,7 @@ rainbow crack --input <HASH> [--salt <SALT>] [--multiplier <N>] --password-list 
 - `--salt, -s <SALT>`: (Optional) Salt appended to each password before hashing.
 - `--multiplier, -m <N>`: (Optional) Number of hash iterations (default: 1).
 - `--password-list, -l <FILE>`: Path to a UTF-8 text file with one password per line.
-- `--verbosity <LEVEL>`: (Optional) Verbosity level (0=silent, 1=normal, 2=verbose; default: 2).
+- `--verbosity <LEVEL>`: (Optional) Verbosity level (0=minimal, 1=reduced, 2=normal; default: 2).
 
 **Examples:**
 
@@ -64,7 +64,7 @@ rainbow hash --algorithm <ALGO> [--multiplier <N>] --input <STRING> [--salt <SAL
 - `--multiplier, -m <N>`: (Optional) Number of hash iterations (default: 1).
 - `--input, -i <STRING>`: The string to hash.
 - `--salt, -s <SALT>`: (Optional) Salt appended to the string before hashing.
-- `--verbosity <LEVEL>`: (Optional) Verbosity level (0=silent, 1=normal, 2=verbose; default: 2).
+- `--verbosity <LEVEL>`: (Optional) Verbosity level (0=minimal, 1=reduced, 2=normal; default: 2).
 
 **Examples:**
 
